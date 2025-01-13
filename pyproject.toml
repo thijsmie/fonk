@@ -1,6 +1,6 @@
 [project]
 name = "fonk"
-version = "0.1.0"
+version = "0.1.1"
 description = "fonk: pyproject.toml based task runner"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,10 @@ dev = [
     "mypy>=1.14.1",
     "pytest>=8.3.4",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project.scripts]
 fonk = "fonk.cli:app"
