@@ -1,4 +1,4 @@
-from tomllib import load
+from tomli import load
 from pathlib import Path
 from typing import Literal, Self
 from dataclasses import dataclass

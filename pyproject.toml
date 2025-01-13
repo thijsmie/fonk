@@ -7,6 +7,7 @@ license = { file = "LICENSE.md" }
 requires-python = ">=3.9"
 dependencies = [
     "rich>=13.9.4",
+    "tomli>=2.2.1",
 ]
 authors = [
     {name = "Thijs Miedema", email = "opensource@tmiedema.com"},
