@@ -1,0 +1,109 @@
+[project]
+name = "fonk"
+version = "0.1.0"
+description = "fonk: pyproject.toml based task runner"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+requires-python = ">=3.9"
+dependencies = [
+    "rich>=13.9.4",
+]
+authors = [
+    {name = "Thijs Miedema", email = "opensource@tmiedema.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.14.1",
+    "pytest>=8.3.4",
+]
+
+[project.scripts]
+fonk = "fonk.cli:app"
+
+[tool.uv]
+package = true
+
+[tool.fonk]
+flags = [
+    {name = "fix", description = "Autofix issues where possible"},
+    {name = "debug", description = "Enable debugging in test suite"},
+]
+
+[tool.fonk.default]
+description = "Most commonly used: run all checks in fix mode"
+command = "all"
+flags = ["fix"]
+
+[tool.fonk.alias.all]
+description = "Run all checks"
+commands = ["uv-lock", "ruff-check", "ruff-format", "mypy", "pytest"]
+
+[tool.fonk.alias.format]
+description = "Check and/or fix code formatting/styling"
+commands = ["ruff-check", "ruff-format"]
+flags = ["fix"]
+
+[tool.fonk.alias.typecheck]
+description = "Run the type checker"
+commands = ["mypy"]
+
+[tool.fonk.alias.test]
+description = "Run the test suite"
+commands = ["pytest"]
+
+[tool.fonk.command.uv-lock]
+type = "shell"
+description = "Check if the lock file is up to date"
+arguments = ["uv", "lock", "--check"]
+flags = [
+    {on = "verbose", add = "--verbose"},
+    {on = "quiet", add = "--quiet"},
+    {on = "fix", remove = "--check"},
+]
+
+[tool.fonk.command.ruff-check]
+type = "uvx"
+description = "Check and/or fix the code style"
+arguments = ["ruff", "check", "src"]
+flags = [
+    {on = "verbose", add = "--verbose"},
+    {on = "quiet", add = "--quiet"},
+    {on = "fix", add = "--fix"},
+]
+
+[tool.fonk.command.ruff-format]
+type = "uvx"
+description = "Check and/or fix code formatting"
+arguments = ["ruff", "format", "--check", "src"]
+flags = [
+    {on = "verbose", add = "--verbose"},
+    {on = "quiet", add = "--quiet"},
+    {on = "fix", remove = "--check"},
+]
+
+[tool.fonk.command.mypy]
+type = "uv"
+description = "Perform static type checking"
+arguments = ["mypy", "src"]
+flags = [
+    {on = "verbose", add = "--verbose"},
+    {on = "quiet", add = "--no-error-summary"}
+]
+
+[tool.fonk.command.pytest]
+type = "uv"
+description = "Run the test suite with pytest"
+arguments = ["pytest", "tests", "--verbose"]
+flags = [
+    {on = "verbose", add = "-vvv", remove = "--verbose"},
+    {on = "quiet", add = ["-q", "--no-summary"], remove = "--verbose"},
+    {on = "fail-quick", add = "-x"},
+    {on = "debug", add = "--pdb"}
+]

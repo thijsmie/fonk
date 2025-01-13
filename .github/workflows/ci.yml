@@ -1,0 +1,14 @@
+name: Commit CI
+
+on:
+  push:
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Run CI with fonk
+        run: uv run fonk all
