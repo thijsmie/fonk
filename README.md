@@ -1,6 +1,6 @@
 <div align="center">
 
-# Fonk
+# 🔥 Fonk 🔥 
 
 Fonk is an open-source command runner that is fully configured via `pyproject.toml`.
 
