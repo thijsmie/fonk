@@ -1,8 +1,24 @@
 from rich.console import Console, Group
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
-from rich.markdown import Markdown
-from fonk.config import Config
+
+from fonk.config import Config, Flag, Option
+
+
+def _render_flag(flag: Flag | Option) -> str:
+    text = f"[yellow]--{flag.name}"
+
+    if flag.shorthand:
+        text += f"/-{flag.shorthand}"
+
+    if isinstance(flag, Option):
+        text += f" [italic]<{flag.type}"
+        if flag.default is not None:
+            text += f"({flag.default})"
+        text += ">[/]"
+
+    return text
 
 
 def render_help(config: Config) -> None:
@@ -32,8 +48,7 @@ def render_help(config: Config) -> None:
 
     for flag in config.flags:
         flags.add_row(
-            f" [bold]•[/] [yellow]--{flag.name}"
-            + (f"/-{flag.shorthand}" if flag.shorthand else ""),
+            _render_flag(flag),
             "[italic]" + (flag.description or ""),
         )
 
@@ -55,7 +70,7 @@ def render_help(config: Config) -> None:
             "[italic]" + (conf.description or ""),
         )
 
-    help = Group(
+    help_markup = Group(
         Markdown("*A `pyproject.toml` driven task runner*"),
         "",
         "[bold green]Usage:[/][cyan] fonk \\[commands] \\[aliases] \\[flags][/]",
@@ -84,7 +99,7 @@ def render_help(config: Config) -> None:
             "[italic]" + (config.default.description or ""),
         )
 
-        help.renderables.extend(
+        help_markup.renderables.extend(
             [
                 "",
                 default_help,
@@ -93,17 +108,11 @@ def render_help(config: Config) -> None:
 
     console.print(
         Panel(
-            help,
-            title=(
-                f"[bold red]🔥 Fonk {config.project_name} 🔥"
-                if config.project_name
-                else "[bold red]🔥 Fonk 🔥"
-            ),
+            help_markup,
+            title=(f"[bold red]🔥 Fonk {config.project_name} 🔥" if config.project_name else "[bold red]🔥 Fonk 🔥"),
             expand=True,
         )
     )
-
-    return
 
 
 def render_header(quiet: bool) -> None:
@@ -163,14 +172,11 @@ def render_help_command(config: Config, cmd: str) -> None:
         )
 
         for flag in config.flags:
-            if not flag.is_builtin and not any(
-                m.on == flag.name for m in command.flags
-            ):
+            if not flag.is_builtin and not any(m.on == flag.name for m in command.flags):
                 continue
 
             flags.add_row(
-                f" [bold]•[/] [yellow]--{flag.name}"
-                + (f"/-{flag.shorthand}" if flag.shorthand else ""),
+                _render_flag(flag),
                 "[italic]" + (flag.description or ""),
             )
 
@@ -191,13 +197,9 @@ def render_help_command(config: Config, cmd: str) -> None:
             for modd in config.commands[subcommand].flags:
                 if modd.on in alias.flags:
                     applicable_mods.append(f"--{modd.on}")
-            help_content.append(
-                f"  [cyan]{subcommand}[/] [yellow]" + " ".join(applicable_mods)
-            )
+            help_content.append(f"  [cyan]{subcommand}[/] [yellow]" + " ".join(applicable_mods))
     else:
         title = f"[bold red]Unknown {cmd}"
         help_content.append(f"[bold red]Unknown command or alias: {cmd}")
 
     console.print(Panel(Group(*help_content), title=title, expand=True))
-
-    return

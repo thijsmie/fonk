@@ -1,12 +1,11 @@
-from tomli import load
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Self
-from dataclasses import dataclass
+
+from tomli import load
+
+from fonk.errors import FonkConfigurationError
 from fonk.locator import get_pyproject
-
-
-class ConfigurationError(Exception):
-    pass
 
 
 @dataclass(kw_only=True)
@@ -65,11 +64,11 @@ class Flag:
     description: str | None = None
     is_builtin: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.shorthand and len(self.shorthand) > 1:
-            raise ConfigurationError("Shorthand must be a single character")
+            raise FonkConfigurationError("Shorthand must be a single character")
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
     @classmethod
@@ -81,9 +80,57 @@ class Flag:
         )
 
 
-FLAG_QUIET = Flag(
-    name="quiet", shorthand="q", description="Suppress output", is_builtin=True
-)
+@dataclass(kw_only=True)
+class Option(Flag):
+    type: Literal["str", "int", "float", "file", "directory"]
+    default: str | None
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __post_init__(self) -> None:
+        if self.shorthand and len(self.shorthand) > 1:
+            raise FonkConfigurationError("Shorthand must be a single character")
+        if self.type not in ["str", "int", "float", "file", "directory"]:
+            raise FonkConfigurationError("Invalid type")
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Self:
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            default=data.get("default"),
+            shorthand=data.get("shorthand"),
+            description=data.get("description"),
+        )
+
+
+@dataclass(kw_only=True)
+class OptionInstance(Option):
+    value: str | int | float | Path
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+
+        try:
+            if self.type == "int":
+                self.value = int(self.value)  # type: ignore
+            elif self.type == "float":
+                self.value = float(self.value)  # type: ignore
+            elif self.type in ["file", "directory"]:
+                self.value = Path(self.value)  # type: ignore
+                if self.type == "file" and self.value.exists() and not self.value.is_file():
+                    raise FonkConfigurationError(f"{self.value} is not a file")
+                if self.type == "directory" and self.value.exists() and not self.value.is_dir():
+                    raise FonkConfigurationError(f"{self.value} is not a directory")
+        except (ValueError, TypeError):
+            raise FonkConfigurationError(f"Invalid value for {self.name}: {self.value}")
+
+
+FLAG_QUIET = Flag(name="quiet", shorthand="q", description="Suppress output", is_builtin=True)
 FLAG_VERBOSE = Flag(
     name="verbose",
     shorthand="v",
@@ -97,10 +144,12 @@ FLAG_FAIL_QUICK = Flag(
     is_builtin=True,
 )
 FLAG_HELP = Flag(name="help", shorthand="h", description="Show help", is_builtin=True)
-FLAG_CONCURRENT = Flag(
+FLAG_CONCURRENT = Option(
     name="concurrent",
+    type="int",
+    default="0",
     shorthand="j",
-    description="Run commands concurrently",
+    description="Run commands concurrently. Specify number of jobs or 0 for CPU count",
     is_builtin=True,
 )
 
@@ -126,51 +175,39 @@ class Config:
     default: Default | None = None
     commands: dict[str, Command]
     aliases: dict[str, Alias]
-    flags: list[Flag]
+    flags: list[Flag | Option]
 
-    def __post_init__(self):
-        if (
-            self.default
-            and self.default.command not in self.commands
-            and self.default.command not in self.aliases
-        ):
-            raise ConfigurationError("Default command not found in commands")
+    def __post_init__(self) -> None:
+        if self.default and self.default.command not in self.commands and self.default.command not in self.aliases:
+            raise FonkConfigurationError("Default command not found in commands")
 
         flags_in_use = set()
         shorthands_in_use = set()
 
         for flag in self.flags:
             if flag.name in flags_in_use:
-                raise ConfigurationError(f"Duplicate flag flag: {flag.name}")
+                raise FonkConfigurationError(f"Duplicate flag flag: {flag.name}")
 
             if flag.shorthand and flag.shorthand in shorthands_in_use:
-                raise ConfigurationError(f"Duplicate flag shorthand: {flag.shorthand}")
+                raise FonkConfigurationError(f"Duplicate flag shorthand: {flag.shorthand}")
 
             flags_in_use.add(flag.name)
             if flag.shorthand:
                 shorthands_in_use.add(flag.shorthand)
 
         for command in self.commands.values():
-            for flag in command.flags:
-                if flag.on not in flags_in_use:
-                    raise ConfigurationError(
-                        f"Unknown flag flag {flag.on} used in {command.name}"
-                    )
+            for aflag in command.flags:
+                if aflag.on not in flags_in_use:
+                    raise FonkConfigurationError(f"Unknown flag flag {aflag.on} used in {command.name}")
 
     @classmethod
     def from_dict(cls, project_name: str | None, data: dict) -> Self:
         return cls(
             project_name=project_name,
             default=Default.from_dict(data["default"]) if "default" in data else None,
-            commands={
-                name: Command.from_dict(name, command)
-                for name, command in data.get("command", {}).items()
-            },
-            aliases={
-                name: Alias.from_dict(alias)
-                for name, alias in data.get("alias", {}).items()
-            },
-            flags=[Flag.from_dict(flag) for flag in data.get("flags", [])]
+            commands={name: Command.from_dict(name, command) for name, command in data.get("command", {}).items()},
+            aliases={name: Alias.from_dict(alias) for name, alias in data.get("alias", {}).items()},
+            flags=[Option.from_dict(flag) if "type" in flag else Flag.from_dict(flag) for flag in data.get("flags", [])]
             + [
                 FLAG_QUIET,
                 FLAG_VERBOSE,
