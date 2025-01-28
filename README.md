@@ -4,7 +4,7 @@
 
 Fonk is an open-source command runner that is fully configured via `pyproject.toml`.
 
-<img src="docs/images/fonk-help/logo.png">
+<img src="docs/images/fonk-help.png">
 
 </div>
 
